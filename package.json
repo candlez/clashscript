@@ -2,13 +2,17 @@
   "name": "clashscript",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.cjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.cjs"
   },
   "author": "Thomas McNamara",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.21.0"
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.2",
+    "nodemon": "^3.1.4"
   }
 }
