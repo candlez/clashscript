@@ -86,6 +86,8 @@ const addBattles = async (tag) => {
             rateLimitFlag = true;
         } else if (error.code === "ETIMEDOUT") {
             rateLimitFlag = true;
+        } else if (error.code === "ECONNRESET") {
+            rateLimitFlag = true;
         } else {
             console.error(error);
             console.log("problem adding battles for: ", tag);
@@ -98,14 +100,38 @@ const addBattles = async (tag) => {
 
 }
 
+const doBatch = async (limit, offset, connection) => {
+    let tags;
+    try {
+        [tags] = await connection.query("SELECT (tag) FROM players WHERE battle1 IS NULL LIMIT ? OFFSET ?;", [limit, offset * 1000]);
+        for (let j = 0; j < tags.length; j++) {
+            if (rateLimitFlag) {
+                console.log("Rate Limited :(");
+                await wait(500);
+                rateLimitFlag = false;
+            }
+            console.log(tags[j].tag);
+            addBattles(tags[j].tag.slice(1, 15));
+            await wait(4);
+        }
+    } catch (error) {
+        if (error.status === 429) {
+            console.log("rate limited");
+        } else {
+            console.error(error);
+            process.exit();
+        }
+    }
+}
+
 const main = async () => {
     const start = process.env.START || 0;
 
     let total;
-    const connection = await db.getConnection();
+    const connection1 = await db.getConnection();
 
     try {
-        total = await connection.query("SELECT COUNT(CASE WHEN battle1 IS NULL THEN 1 END) from players;");
+        total = await connection1.query("SELECT COUNT(CASE WHEN battle1 IS NULL THEN 1 END) from players;");
     } catch (error) {
         console.log("failed to get total")
         process.exit();
@@ -114,33 +140,10 @@ const main = async () => {
     total = total[0][0]['COUNT(CASE WHEN battle1 IS NULL THEN 1 END)'];
     console.log(total);
 
-    for (let i = start; i < total; i += 150) {
-        let tags;
-        try {
-            [tags] = await connection.query("SELECT (tag) FROM players WHERE battle1 IS NULL LIMIT 150 OFFSET ?;", i);
-            for (let j = 0; j < tags.length; j++) {
-                if (rateLimitFlag) {
-                    console.log("Rate Limited :(");
-                    await wait(500);
-                    rateLimitFlag = false;
-                }
-                console.log(tags[j].tag);
-                addBattles(tags[j].tag.slice(1, 15));
-                await wait(4);
-            }
-        } catch (error) {
-            if (error.status === 429) {
-                console.log("rate limited");
-            } else {
-                console.error(error);
-                console.log("failed to get tags starting at: ", i);
-                process.exit();
-            }
-        }
-    }
+    await doBatch(total, 0, connection1);
 
 
-    connection.release();
+    connection1.release();
 }
 
 main();
